@@ -111,7 +111,7 @@ export const storage = {
     };
   },
 
-  importData: (data: any) => {
+  importData: (data: { event?: CompetitionEvent; settings?: AppSettings }) => {
     if (typeof window === 'undefined') return false;
 
     try {
@@ -161,14 +161,14 @@ export const storage = {
       ];
 
       // Add sample scenes to each team
-      teams.forEach((team, teamIndex) => {
+      teams.forEach((team) => {
         const scenes = [
-          createNewScene(team.id, 'Project Introduction', 'Welcome and overview of our project goals and objectives.', 3, 1),
-          createNewScene(team.id, 'Problem Statement', 'Detailed explanation of the problem we are solving.', 4, 2),
-          createNewScene(team.id, 'Solution Overview', 'Our innovative approach and solution architecture.', 5, 3),
-          createNewScene(team.id, 'Technical Implementation', 'Deep dive into the technical aspects and code.', 6, 4),
-          createNewScene(team.id, 'Demo & Results', 'Live demonstration and results showcase.', 7, 5),
-          createNewScene(team.id, 'Future Plans', 'Next steps and future development roadmap.', 3, 6),
+          createNewScene(team.id, 'Project Introduction', 'Welcome and overview of our project goals and objectives.', 1, 3),
+          createNewScene(team.id, 'Problem Statement', 'Detailed explanation of the problem we are solving.', 2, 4),
+          createNewScene(team.id, 'Solution Overview', 'Our innovative approach and solution architecture.', 3, 5),
+          createNewScene(team.id, 'Technical Implementation', 'Deep dive into the technical aspects and code.', 4, 6),
+          createNewScene(team.id, 'Demo & Results', 'Live demonstration and results showcase.', 5, 7),
+          createNewScene(team.id, 'Future Plans', 'Next steps and future development roadmap.', 6, 3),
         ];
         team.scenes = scenes;
       });
@@ -220,7 +220,8 @@ export const createNewScene = (
   teamId: string,
   title: string,
   content: string = '',
-  order: number = 0
+  order: number = 0,
+  duration?: number
 ): Scene => {
   const now = new Date();
   return {
@@ -229,6 +230,7 @@ export const createNewScene = (
     title,
     content,
     order,
+    duration,
     status: 'not-started',
     createdAt: now,
     updatedAt: now,

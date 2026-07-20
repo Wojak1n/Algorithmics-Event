@@ -23,17 +23,8 @@ export default function EditTeamPage() {
     logoUrl: undefined as string | undefined,
   });
 
-  // Safety check for state
-  if (!state?.event) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  const teams = state.event.teams || [];
-  const categories = state.event.categories || [];
+  const teams = state?.event?.teams ?? [];
+  const categories = state?.event?.categories ?? [];
   const team = teams.find(t => t.id === teamId);
 
   useEffect(() => {
@@ -48,6 +39,15 @@ export default function EditTeamPage() {
       });
     }
   }, [team]);
+
+  // Safety check for state. This must come after hooks to preserve hook order.
+  if (!state?.event) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   const handleAddMember = () => {
     setFormData(prev => ({

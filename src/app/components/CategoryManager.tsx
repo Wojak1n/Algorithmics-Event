@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { TeamCategory } from '../types';
-import { Plus, Trash2, Edit, Palette, X, Edit2, Save, RotateCcw } from 'lucide-react';
+import { Plus, Trash2, Palette, X, Edit2, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const PRESET_COLORS = [

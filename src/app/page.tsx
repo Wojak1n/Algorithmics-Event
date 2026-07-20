@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { useApp } from "./context/AppContext";
-import { Users, FileText, Search, Timer, Moon, Sun, Database, Award } from "lucide-react";
+import { Users, FileText, Search, Timer, Moon, Sun } from "lucide-react";
 import DataManager from "./components/DataManager";
-import toast from "react-hot-toast";
 
 export default function Home() {
-  const { state, updateSettings, dispatch } = useApp();
+  const { state, updateSettings } = useApp();
 
   const handleDataImported = () => {
     // Reload the app state after data import

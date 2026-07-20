@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useApp } from '../context/AppContext';
 import { Plus, Users, Edit, Trash2, FileText, ArrowLeft, Filter, Settings, Palette, CheckCircle, Circle } from 'lucide-react';
-import { TeamCategory } from '../types';
 import CategoryManager from '../components/CategoryManager';
 import ImageUpload from '../components/ImageUpload';
 import { getTeamDisplayImage } from '../lib/imageUtils';
@@ -88,18 +88,6 @@ export default function TeamsPage() {
     logoUrl: undefined as string | undefined,
   });
 
-  // Safety check for state
-  if (!state?.event) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  const teams = state.event.teams || [];
-  const categories = state.event.categories || [];
-
   // Load member colors and presentation status from localStorage on component mount
   useEffect(() => {
     try {
@@ -120,6 +108,18 @@ export default function TeamsPage() {
       console.error('Error loading data from localStorage:', error);
     }
   }, []);
+
+  // Safety check for state. This must come after hooks to preserve hook order.
+  if (!state?.event) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  const teams = state.event.teams || [];
+  const categories = state.event.categories || [];
 
   // Function to save member colors to localStorage
   const saveMemberColorsToStorage = (colors: {[teamId: string]: {[memberIndex: number]: number}}) => {
@@ -354,7 +354,7 @@ export default function TeamsPage() {
             })}
             {categories.length === 0 && (
               <p className="text-sm text-gray-500 dark:text-gray-400 italic">
-                No categories created yet. Click "Manage Categories" to create some!
+                No categories created yet. Click &quot;Manage Categories&quot; to create some!
               </p>
             )}
           </div>
@@ -513,9 +513,11 @@ export default function TeamsPage() {
                   >
                 <div className="p-6">
                   <div className="flex items-start gap-4 mb-4">
-                    <img
+                    <Image
                       src={getTeamDisplayImage(team)}
                       alt={`${team.name} logo`}
+                      width={64}
+                      height={64}
                       className="w-16 h-16 rounded-lg object-cover border-2 border-gray-200 dark:border-gray-600 flex-shrink-0"
                     />
                     <div className="flex-1 min-w-0">
@@ -610,9 +612,13 @@ export default function TeamsPage() {
                     <div className="flex items-center justify-between mt-2">
                       <div className="flex items-center gap-2 text-sm">
                         {presentationStatus[team.id] ? (
-                          <CheckCircle className="h-5 w-5 text-green-500" title="Presentation completed" />
+                          <span title="Presentation completed">
+                            <CheckCircle className="h-5 w-5 text-green-500" />
+                          </span>
                         ) : (
-                          <Circle className="h-5 w-5 text-gray-400" title="Presentation not completed" />
+                          <span title="Presentation not completed">
+                            <Circle className="h-5 w-5 text-gray-400" />
+                          </span>
                         )}
                         <span className={presentationStatus[team.id] ? "text-green-600 dark:text-green-400 font-medium" : "text-gray-600 dark:text-gray-300"}>
                           {presentationStatus[team.id] ? "Presentation completed" : "Presentation not completed"}

@@ -209,7 +209,7 @@ export default function DataManager({ onDataImported }: DataManagerProps) {
       <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
         <h4 className="font-medium text-gray-900 dark:text-white mb-2">Data Recovery Instructions:</h4>
         <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-          <li>• If you had data on port 3000, it's stored separately from port 3001</li>
+          <li>• If you had data on port 3000, it&apos;s stored separately from port 3001</li>
           <li>• Export your data regularly to avoid losing it during development</li>
           <li>• Import files must be valid JSON exports from this application</li>
           <li>• Importing will overwrite existing data</li>

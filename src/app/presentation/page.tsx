@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense, useCallback } from 'react';
+import { useState, useEffect, Suspense, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useApp } from '../context/AppContext';
@@ -44,12 +44,12 @@ function PresentationContent() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const resetTimer = () => {
+  const resetTimer = useCallback(() => {
     setTimeElapsed(0);
     setIsTimerActive(false);
-  };
+  }, []);
 
-  const toggleFullscreen = () => {
+  const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen();
       setIsFullscreen(true);
@@ -57,7 +57,7 @@ function PresentationContent() {
       document.exitFullscreen();
       setIsFullscreen(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -71,7 +71,10 @@ function PresentationContent() {
   // Navigation helpers - moved before early return to avoid conditional hook calls
   const selectedTeamData = state.event?.teams?.find(team => team.id === selectedTeam);
   const selectedSceneData = selectedTeamData?.scenes.find(scene => scene.id === selectedScene);
-  const sortedScenes = selectedTeamData?.scenes?.sort((a, b) => a.order - b.order) || [];
+  const sortedScenes = useMemo(
+    () => [...(selectedTeamData?.scenes ?? [])].sort((a, b) => a.order - b.order),
+    [selectedTeamData?.scenes]
+  );
   const currentSceneIndex = sortedScenes.findIndex(scene => scene.id === selectedScene);
   const hasPreviousScene = currentSceneIndex > 0;
   const hasNextScene = currentSceneIndex < sortedScenes.length - 1;

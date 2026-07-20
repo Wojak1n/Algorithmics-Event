@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import Image from 'next/image';
 import { Upload, X, Image as ImageIcon } from 'lucide-react';
 import { processImageFile, getTeamDisplayImage } from '../lib/imageUtils';
 import toast from 'react-hot-toast';
@@ -34,7 +35,7 @@ export default function ImageUpload({
       } else {
         toast.error(result.error || 'Failed to upload image');
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to process image');
     } finally {
       setIsUploading(false);
@@ -87,9 +88,12 @@ export default function ImageUpload({
       {/* Image Preview */}
       <div className="flex items-center space-x-4">
         <div className="relative">
-          <img
+          <Image
             src={displayImage}
             alt={`${teamName} logo`}
+            width={80}
+            height={80}
+            unoptimized
             className="w-20 h-20 rounded-lg object-cover border-2 border-gray-200 dark:border-gray-600"
           />
           {currentImage && (
