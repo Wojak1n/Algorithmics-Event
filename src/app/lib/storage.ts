@@ -1,0 +1,255 @@
+import { Team, Scene, CompetitionEvent, AppSettings, TeamCategory } from '../types';
+
+const STORAGE_KEYS = {
+  COMPETITION_EVENT: 'algorithmics_competition_event',
+  APP_SETTINGS: 'algorithmics_app_settings',
+} as const;
+
+// Default data
+const DEFAULT_EVENT: CompetitionEvent = {
+  id: 'algorithmics-2025',
+  name: 'Algorithmics IT Competition 2025',
+  year: 2025,
+  description: 'Annual programming competition showcasing innovative projects and presentations',
+  teams: [],
+  categories: [],
+};
+
+const DEFAULT_SETTINGS: AppSettings = {
+  darkMode: false,
+  autoSave: true,
+  defaultSceneDuration: 5,
+};
+
+// Storage utilities
+export const storage = {
+  // Competition Event
+  getEvent: (): CompetitionEvent => {
+    if (typeof window === 'undefined') return DEFAULT_EVENT;
+    
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.COMPETITION_EVENT);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Convert date strings back to Date objects
+        parsed.teams = parsed.teams.map((team: Team & { createdAt: string; updatedAt: string; scenes: (Scene & { createdAt: string; updatedAt: string })[] }) => ({
+          ...team,
+          createdAt: new Date(team.createdAt),
+          updatedAt: new Date(team.updatedAt),
+          scenes: team.scenes.map((scene: Scene & { createdAt: string; updatedAt: string }) => ({
+            ...scene,
+            createdAt: new Date(scene.createdAt),
+            updatedAt: new Date(scene.updatedAt),
+          })),
+        }));
+        return parsed;
+      }
+    } catch (error) {
+      console.error('Error loading event data:', error);
+    }
+    
+    return DEFAULT_EVENT;
+  },
+
+  saveEvent: (event: CompetitionEvent): void => {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      localStorage.setItem(STORAGE_KEYS.COMPETITION_EVENT, JSON.stringify(event));
+    } catch (error) {
+      console.error('Error saving event data:', error);
+    }
+  },
+
+  // App Settings
+  getSettings: (): AppSettings => {
+    if (typeof window === 'undefined') return DEFAULT_SETTINGS;
+    
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.APP_SETTINGS);
+      if (stored) {
+        return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+    
+    return DEFAULT_SETTINGS;
+  },
+
+  saveSettings: (settings: AppSettings): void => {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      localStorage.setItem(STORAGE_KEYS.APP_SETTINGS, JSON.stringify(settings));
+    } catch (error) {
+      console.error('Error saving settings:', error);
+    }
+  },
+
+  // Clear all data
+  clearAll: (): void => {
+    if (typeof window === 'undefined') return;
+
+    Object.values(STORAGE_KEYS).forEach(key => {
+      localStorage.removeItem(key);
+    });
+  },
+
+  // Data export/import for backup and recovery
+  exportData: () => {
+    if (typeof window === 'undefined') return null;
+
+    const event = storage.getEvent();
+    const settings = storage.getSettings();
+
+    return {
+      event,
+      settings,
+      exportDate: new Date().toISOString(),
+      version: '1.0'
+    };
+  },
+
+  importData: (data: any) => {
+    if (typeof window === 'undefined') return false;
+
+    try {
+      if (data.event) {
+        storage.saveEvent(data.event);
+      }
+      if (data.settings) {
+        storage.saveSettings(data.settings);
+      }
+      return true;
+    } catch (error) {
+      console.error('Error importing data:', error);
+      return false;
+    }
+  },
+
+  // Check if data exists
+  hasData: () => {
+    if (typeof window === 'undefined') return false;
+    const event = storage.getEvent();
+    return event.teams.length > 0 || event.categories.length > 0;
+  },
+
+  // Load sample data for quick start
+  loadSampleData: () => {
+    if (typeof window === 'undefined') return false;
+
+    try {
+      const event = storage.getEvent();
+
+      // Create sample categories
+      const categories = [
+        createNewCategory('Web Development', 'Modern web applications and websites', 'text-blue-800', 'bg-blue-100', '🌐'),
+        createNewCategory('Mobile Apps', 'iOS and Android applications', 'text-green-800', 'bg-green-100', '📱'),
+        createNewCategory('AI & Machine Learning', 'Artificial intelligence and ML projects', 'text-purple-800', 'bg-purple-100', '🤖'),
+        createNewCategory('Game Development', 'Video games and interactive experiences', 'text-red-800', 'bg-red-100', '🎮'),
+        createNewCategory('Data Science', 'Data analysis and visualization projects', 'text-yellow-800', 'bg-yellow-100', '📊'),
+      ];
+
+      // Create sample teams
+      const teams = [
+        createNewTeam('Code Warriors', 'Coding the future, one line at a time', 'E-Commerce Platform', categories[0].id, ['Alice Johnson', 'Bob Smith', 'Carol Davis']),
+        createNewTeam('Tech Innovators', 'Innovation through technology', 'Fitness Tracking App', categories[1].id, ['David Wilson', 'Emma Brown', 'Frank Miller']),
+        createNewTeam('AI Pioneers', 'Pioneering the AI revolution', 'Smart Chatbot Assistant', categories[2].id, ['Grace Lee', 'Henry Taylor', 'Ivy Chen']),
+        createNewTeam('Game Masters', 'Creating immersive gaming experiences', '2D Puzzle Adventure', categories[3].id, ['Jack Anderson', 'Kate Thompson', 'Leo Garcia']),
+        createNewTeam('Data Wizards', 'Turning data into insights', 'Sales Analytics Dashboard', categories[4].id, ['Maya Patel', 'Noah Rodriguez', 'Olivia Kim']),
+      ];
+
+      // Add sample scenes to each team
+      teams.forEach((team, teamIndex) => {
+        const scenes = [
+          createNewScene(team.id, 'Project Introduction', 'Welcome and overview of our project goals and objectives.', 3, 1),
+          createNewScene(team.id, 'Problem Statement', 'Detailed explanation of the problem we are solving.', 4, 2),
+          createNewScene(team.id, 'Solution Overview', 'Our innovative approach and solution architecture.', 5, 3),
+          createNewScene(team.id, 'Technical Implementation', 'Deep dive into the technical aspects and code.', 6, 4),
+          createNewScene(team.id, 'Demo & Results', 'Live demonstration and results showcase.', 7, 5),
+          createNewScene(team.id, 'Future Plans', 'Next steps and future development roadmap.', 3, 6),
+        ];
+        team.scenes = scenes;
+      });
+
+      const updatedEvent = {
+        ...event,
+        teams,
+        categories,
+      };
+
+      storage.saveEvent(updatedEvent);
+      return true;
+    } catch (error) {
+      console.error('Error loading sample data:', error);
+      return false;
+    }
+  },
+};
+
+// Utility functions for data manipulation
+export const generateId = (): string => {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+};
+
+export const createNewTeam = (
+  name: string,
+  slogan: string,
+  projectName: string,
+  categoryId: string,
+  members: string[],
+  logoUrl?: string
+): Team => {
+  const now = new Date();
+  return {
+    id: generateId(),
+    name,
+    slogan,
+    projectName,
+    categoryId,
+    members,
+    scenes: [],
+    logoUrl,
+    createdAt: now,
+    updatedAt: now,
+  };
+};
+
+export const createNewScene = (
+  teamId: string,
+  title: string,
+  content: string = '',
+  order: number = 0
+): Scene => {
+  const now = new Date();
+  return {
+    id: generateId(),
+    teamId,
+    title,
+    content,
+    order,
+    status: 'not-started',
+    createdAt: now,
+    updatedAt: now,
+  };
+};
+
+export const createNewCategory = (
+  name: string,
+  description: string,
+  color: string,
+  bgColor: string,
+  icon: string
+): TeamCategory => {
+  const now = new Date();
+  return {
+    id: generateId(),
+    name,
+    description,
+    color,
+    bgColor,
+    icon,
+    createdAt: now,
+  };
+};
