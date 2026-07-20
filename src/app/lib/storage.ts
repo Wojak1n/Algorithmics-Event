@@ -31,18 +31,24 @@ export const storage = {
       const stored = localStorage.getItem(STORAGE_KEYS.COMPETITION_EVENT);
       if (stored) {
         const parsed = JSON.parse(stored);
-        // Convert date strings back to Date objects
-        parsed.teams = parsed.teams.map((team: Team & { createdAt: string; updatedAt: string; scenes: (Scene & { createdAt: string; updatedAt: string })[] }) => ({
-          ...team,
-          createdAt: new Date(team.createdAt),
-          updatedAt: new Date(team.updatedAt),
-          scenes: team.scenes.map((scene: Scene & { createdAt: string; updatedAt: string }) => ({
-            ...scene,
-            createdAt: new Date(scene.createdAt),
-            updatedAt: new Date(scene.updatedAt),
-          })),
-        }));
-        return parsed;
+          // Ensure parsed has arrays and convert date strings back to Date objects safely
+          const safeTeams = Array.isArray(parsed.teams) ? parsed.teams : [];
+          parsed.teams = safeTeams.map((team: any) => {
+            const scenesArr = Array.isArray(team.scenes) ? team.scenes : [];
+            return {
+              ...team,
+              createdAt: team.createdAt ? new Date(team.createdAt) : new Date(),
+              updatedAt: team.updatedAt ? new Date(team.updatedAt) : new Date(),
+              scenes: scenesArr.map((scene: any) => ({
+                ...scene,
+                createdAt: scene.createdAt ? new Date(scene.createdAt) : new Date(),
+                updatedAt: scene.updatedAt ? new Date(scene.updatedAt) : new Date(),
+              })),
+            } as Team;
+          });
+          // Ensure categories exists
+          parsed.categories = Array.isArray(parsed.categories) ? parsed.categories : [];
+          return parsed;
       }
     } catch (error) {
       console.error('Error loading event data:', error);
