@@ -93,7 +93,7 @@ export default function Home() {
               <FileText className="h-8 w-8 text-green-600 dark:text-green-400" />
               <div className="ml-4">
                 <p className="text-2xl font-bold">
-                  {state.event.teams.reduce((total, team) => total + team.scenes.length, 0)}
+                  {state.event.teams.reduce((total, team) => total + ((team.scenes && team.scenes.length) ? team.scenes.length : 0), 0)}
                 </p>
                 <p className="text-gray-600 dark:text-gray-300">Total Scenes</p>
               </div>
@@ -105,7 +105,7 @@ export default function Home() {
               <div className="ml-4">
                 <p className="text-2xl font-bold">
                   {state.event.teams.reduce((total, team) =>
-                    total + team.scenes.filter(scene => scene.status === 'complete').length, 0
+                      total + (Array.isArray(team.scenes) ? team.scenes.filter(scene => scene.status === 'complete').length : 0), 0
                   )}
                 </p>
                 <p className="text-gray-600 dark:text-gray-300">Completed Scenes</p>

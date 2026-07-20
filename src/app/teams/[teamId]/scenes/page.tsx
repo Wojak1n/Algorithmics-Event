@@ -149,7 +149,7 @@ export default function TeamScenesPage() {
         )}
 
         {/* Scenes List */}
-        {team.scenes.length === 0 ? (
+        {(team.scenes ?? []).length === 0 ? (
           <div className="text-center py-16">
             <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-semibold mb-2">No scenes yet</h3>
@@ -166,7 +166,7 @@ export default function TeamScenesPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {team.scenes
+            {(team.scenes || [])
               .sort((a, b) => a.order - b.order)
               .map((scene, index) => {
                 const StatusIcon = statusConfig[scene.status].icon;

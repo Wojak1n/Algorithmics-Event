@@ -218,7 +218,7 @@ function PresentationContent() {
                         Project: {team.projectName}
                       </p>
                       <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
-                        {team.scenes.length} scenes
+                        {(team.scenes || []).length} scenes
                       </p>
                     </button>
                   ))}
@@ -237,7 +237,7 @@ function PresentationContent() {
                     Project: {selectedTeamData.projectName}
                   </p>
                 </div>
-                {selectedTeamData.scenes.length === 0 ? (
+                {(selectedTeamData.scenes || []).length === 0 ? (
                   <div className="text-center py-8">
                     <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600 dark:text-gray-300">No scenes available</p>
@@ -250,7 +250,7 @@ function PresentationContent() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {selectedTeamData.scenes
+                    {(selectedTeamData.scenes || [])
                       .sort((a, b) => a.order - b.order)
                       .map(scene => (
                         <button

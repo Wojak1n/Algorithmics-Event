@@ -34,7 +34,7 @@ export default function EditTeamPage() {
         slogan: team.slogan,
         projectName: team.projectName,
         categoryId: team.categoryId,
-        members: team.members.length > 0 ? team.members : [''],
+        members: (team.members && team.members.length > 0) ? team.members : [''],
         logoUrl: team.logoUrl,
       });
     }
@@ -267,12 +267,12 @@ export default function EditTeamPage() {
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span className="font-medium text-gray-700 dark:text-gray-300">Total Scenes:</span>
-              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{team.scenes.length}</p>
+              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{(team.scenes || []).length}</p>
             </div>
             <div>
               <span className="font-medium text-gray-700 dark:text-gray-300">Completed Scenes:</span>
               <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                {team.scenes.filter(scene => scene.status === 'complete').length}
+                {(team.scenes || []).filter(scene => scene.status === 'complete').length}
               </p>
             </div>
             <div>

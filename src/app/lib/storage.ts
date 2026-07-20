@@ -33,16 +33,16 @@ export const storage = {
         const parsed = JSON.parse(stored);
           // Ensure parsed has arrays and convert date strings back to Date objects safely
           const safeTeams = Array.isArray(parsed.teams) ? parsed.teams : [];
-          parsed.teams = safeTeams.map((team: any) => {
+          parsed.teams = safeTeams.map((team: Team & { createdAt?: string | Date; updatedAt?: string | Date; scenes?: (Scene & { createdAt?: string | Date; updatedAt?: string | Date })[] }) => {
             const scenesArr = Array.isArray(team.scenes) ? team.scenes : [];
             return {
               ...team,
-              createdAt: team.createdAt ? new Date(team.createdAt) : new Date(),
-              updatedAt: team.updatedAt ? new Date(team.updatedAt) : new Date(),
-              scenes: scenesArr.map((scene: any) => ({
+              createdAt: team.createdAt ? new Date(team.createdAt as string) : new Date(),
+              updatedAt: team.updatedAt ? new Date(team.updatedAt as string) : new Date(),
+              scenes: scenesArr.map((scene: Scene & { createdAt?: string | Date; updatedAt?: string | Date }) => ({
                 ...scene,
-                createdAt: scene.createdAt ? new Date(scene.createdAt) : new Date(),
-                updatedAt: scene.updatedAt ? new Date(scene.updatedAt) : new Date(),
+                createdAt: scene.createdAt ? new Date(scene.createdAt as string) : new Date(),
+                updatedAt: scene.updatedAt ? new Date(scene.updatedAt as string) : new Date(),
               })),
             } as Team;
           });

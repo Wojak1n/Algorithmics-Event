@@ -337,7 +337,7 @@ export default function TeamsPage() {
               All Categories ({teams.length})
             </button>
             {categories.map(category => {
-              const count = teams.filter(team => team.categoryId === category.id).length;
+              const count = (teams || []).filter(team => team.categoryId === category.id).length;
               return (
                 <button
                   key={category.id}
@@ -563,10 +563,10 @@ export default function TeamsPage() {
 
                   <div className="mb-4">
                     <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Members ({team.members.length}):
+                      Members ({(team.members || []).length}):
                     </p>
                     <div className="flex flex-wrap gap-1">
-                      {team.members.map((member, index) => {
+                      {(team.members || []).map((member, index) => {
                         const colorIndex = memberColors[team.id]?.[index] || 0;
                         const selectedColor = memberColorOptions[colorIndex];
                         return (
@@ -597,9 +597,9 @@ export default function TeamsPage() {
                   
                   <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                        <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
                         <FileText className="h-4 w-4 mr-1" />
-                        {team.scenes.length} scenes
+                        {(team.scenes || []).length} scenes
                       </div>
                       <Link
                         href={`/teams/${team.id}/scenes`}

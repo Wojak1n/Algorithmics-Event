@@ -46,10 +46,10 @@ export default function SearchPage() {
     // Search scenes
     if (filter === 'all' || filter === 'scenes') {
       state.event.teams.forEach(team => {
-        team.scenes.forEach(scene => {
-          const matchesTitle = scene.title.toLowerCase().includes(searchTerm);
-          const matchesContent = scene.content.toLowerCase().includes(searchTerm);
-          const matchesNotes = scene.notes?.toLowerCase().includes(searchTerm);
+        (team.scenes || []).forEach(scene => {
+          const matchesTitle = (scene.title || '').toLowerCase().includes(searchTerm);
+          const matchesContent = (scene.content || '').toLowerCase().includes(searchTerm);
+          const matchesNotes = scene.notes ? scene.notes.toLowerCase().includes(searchTerm) : false;
 
           if (matchesTitle || matchesContent || matchesNotes) {
             results.push({
@@ -214,8 +214,8 @@ export default function SearchPage() {
                         </div>
                         <div>
                           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Scenes: {(result.item as Team).scenes.length}
-                          </span>
+                              Scenes: {(((result.item as Team).scenes) || []).length}
+                            </span>
                         </div>
                       </div>
                     </div>

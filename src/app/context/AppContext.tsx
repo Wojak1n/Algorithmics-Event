@@ -252,7 +252,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addScene = (teamId: string, title: string, content: string = '') => {
     const team = state.event.teams.find(t => t.id === teamId);
-    const order = team ? team.scenes.length : 0;
+    const order = team ? (team.scenes ? team.scenes.length : 0) : 0;
     const newScene = createNewScene(teamId, title, content, order);
     dispatch({ type: 'ADD_SCENE', payload: { teamId, scene: newScene } });
   };

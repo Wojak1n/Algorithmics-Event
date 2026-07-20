@@ -27,12 +27,12 @@ export default function ScenesPage() {
 
   const filteredScenes = selectedTeam === 'all' 
     ? state.event.teams.flatMap(team => 
-        team.scenes.map(scene => ({ ...scene, teamName: team.name, teamId: team.id }))
+        (team.scenes || []).map(scene => ({ ...scene, teamName: team.name, teamId: team.id }))
       )
     : state.event.teams
         .filter(team => team.id === selectedTeam)
         .flatMap(team => 
-          team.scenes.map(scene => ({ ...scene, teamName: team.name, teamId: team.id }))
+          (team.scenes || []).map(scene => ({ ...scene, teamName: team.name, teamId: team.id }))
         );
 
   const handleStatusChange = (teamId: string, sceneId: string, status: SceneStatus) => {
