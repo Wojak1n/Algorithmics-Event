@@ -1,9 +1,78 @@
 import { Team, Scene, CompetitionEvent, AppSettings, TeamCategory } from '../types';
+import { isSupabaseConfigured, supabase } from './supabase';
 
 const STORAGE_KEYS = {
   COMPETITION_EVENT: 'algorithmics_competition_event',
   APP_SETTINGS: 'algorithmics_app_settings',
 } as const;
+
+const TABLE_NAME = 'competition_event';
+
+const normalizeEvent = (event: Partial<CompetitionEvent> | null | undefined): CompetitionEvent => {
+  const baseEvent: CompetitionEvent = {
+    id: 'algorithmics-2025',
+    name: 'Algorithmics IT Competition 2025',
+    year: 2025,
+    description: 'Annual programming competition showcasing innovative projects and presentations',
+    teams: [],
+    categories: [],
+    ...event,
+  };
+
+  return {
+    ...baseEvent,
+    teams: Array.isArray(baseEvent.teams) ? baseEvent.teams : [],
+    categories: Array.isArray(baseEvent.categories) ? baseEvent.categories : [],
+  };
+};
+
+const cloneEvent = (event: CompetitionEvent): CompetitionEvent => JSON.parse(JSON.stringify(event));
+
+async function syncToSupabase(event: CompetitionEvent, settings: AppSettings) {
+  if (!isSupabaseConfigured() || !supabase) {
+    return;
+  }
+
+  try {
+    const payload = {
+      id: 'default',
+      event: cloneEvent(event),
+      settings,
+      updated_at: new Date().toISOString(),
+    };
+
+    await supabase.from(TABLE_NAME).upsert(payload, { onConflict: 'id' }).select();
+  } catch (error) {
+    console.error('Error syncing data to Supabase:', error);
+  }
+}
+
+async function loadFromSupabase(): Promise<{ event: CompetitionEvent; settings: AppSettings } | null> {
+  if (!isSupabaseConfigured() || !supabase) {
+    return null;
+  }
+
+  try {
+    const { data, error } = await supabase.from(TABLE_NAME).select('*').eq('id', 'default').maybeSingle();
+
+    if (error) {
+      console.error('Error loading from Supabase:', error);
+      return null;
+    }
+
+    if (!data) {
+      return null;
+    }
+
+    return {
+      event: normalizeEvent(data.event as Partial<CompetitionEvent>),
+      settings: data.settings as AppSettings,
+    };
+  } catch (error) {
+    console.error('Error loading from Supabase:', error);
+    return null;
+  }
+}
 
 // Default data
 const DEFAULT_EVENT: CompetitionEvent = {
@@ -26,42 +95,41 @@ export const storage = {
   // Competition Event
   getEvent: (): CompetitionEvent => {
     if (typeof window === 'undefined') return DEFAULT_EVENT;
-    
+
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.COMPETITION_EVENT);
       if (stored) {
         const parsed = JSON.parse(stored);
-          // Ensure parsed has arrays and convert date strings back to Date objects safely
-          const safeTeams = Array.isArray(parsed.teams) ? parsed.teams : [];
-          parsed.teams = safeTeams.map((team: Team & { createdAt?: string | Date; updatedAt?: string | Date; scenes?: (Scene & { createdAt?: string | Date; updatedAt?: string | Date })[] }) => {
-            const scenesArr = Array.isArray(team.scenes) ? team.scenes : [];
-            return {
-              ...team,
-              createdAt: team.createdAt ? new Date(team.createdAt as string) : new Date(),
-              updatedAt: team.updatedAt ? new Date(team.updatedAt as string) : new Date(),
-              scenes: scenesArr.map((scene: Scene & { createdAt?: string | Date; updatedAt?: string | Date }) => ({
-                ...scene,
-                createdAt: scene.createdAt ? new Date(scene.createdAt as string) : new Date(),
-                updatedAt: scene.updatedAt ? new Date(scene.updatedAt as string) : new Date(),
-              })),
-            } as Team;
-          });
-          // Ensure categories exists
-          parsed.categories = Array.isArray(parsed.categories) ? parsed.categories : [];
-          return parsed;
+        const safeTeams = Array.isArray(parsed.teams) ? parsed.teams : [];
+        parsed.teams = safeTeams.map((team: Team & { createdAt?: string | Date; updatedAt?: string | Date; scenes?: (Scene & { createdAt?: string | Date; updatedAt?: string | Date })[] }) => {
+          const scenesArr = Array.isArray(team.scenes) ? team.scenes : [];
+          return {
+            ...team,
+            createdAt: team.createdAt ? new Date(team.createdAt as string) : new Date(),
+            updatedAt: team.updatedAt ? new Date(team.updatedAt as string) : new Date(),
+            scenes: scenesArr.map((scene: Scene & { createdAt?: string | Date; updatedAt?: string | Date }) => ({
+              ...scene,
+              createdAt: scene.createdAt ? new Date(scene.createdAt as string) : new Date(),
+              updatedAt: scene.updatedAt ? new Date(scene.updatedAt as string) : new Date(),
+            })),
+          } as Team;
+        });
+        parsed.categories = Array.isArray(parsed.categories) ? parsed.categories : [];
+        return normalizeEvent(parsed);
       }
     } catch (error) {
       console.error('Error loading event data:', error);
     }
-    
+
     return DEFAULT_EVENT;
   },
 
   saveEvent: (event: CompetitionEvent): void => {
     if (typeof window === 'undefined') return;
-    
+
     try {
       localStorage.setItem(STORAGE_KEYS.COMPETITION_EVENT, JSON.stringify(event));
+      void syncToSupabase(event, storage.getSettings());
     } catch (error) {
       console.error('Error saving event data:', error);
     }
@@ -70,7 +138,7 @@ export const storage = {
   // App Settings
   getSettings: (): AppSettings => {
     if (typeof window === 'undefined') return DEFAULT_SETTINGS;
-    
+
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.APP_SETTINGS);
       if (stored) {
@@ -79,15 +147,17 @@ export const storage = {
     } catch (error) {
       console.error('Error loading settings:', error);
     }
-    
+
     return DEFAULT_SETTINGS;
   },
 
   saveSettings: (settings: AppSettings): void => {
     if (typeof window === 'undefined') return;
-    
+
     try {
       localStorage.setItem(STORAGE_KEYS.APP_SETTINGS, JSON.stringify(settings));
+      const event = storage.getEvent();
+      void syncToSupabase(event, settings);
     } catch (error) {
       console.error('Error saving settings:', error);
     }
@@ -100,6 +170,10 @@ export const storage = {
     Object.values(STORAGE_KEYS).forEach(key => {
       localStorage.removeItem(key);
     });
+
+    if (isSupabaseConfigured() && supabase) {
+      void supabase.from(TABLE_NAME).delete().eq('id', 'default');
+    }
   },
 
   // Data export/import for backup and recovery
@@ -130,6 +204,27 @@ export const storage = {
       return true;
     } catch (error) {
       console.error('Error importing data:', error);
+      return false;
+    }
+  },
+
+  hydrateFromRemote: async () => {
+    if (typeof window === 'undefined') return false;
+
+    try {
+      const remoteData = await loadFromSupabase();
+      if (!remoteData) {
+        return false;
+      }
+
+      const event = normalizeEvent(remoteData.event);
+      const settings = remoteData.settings || DEFAULT_SETTINGS;
+
+      localStorage.setItem(STORAGE_KEYS.COMPETITION_EVENT, JSON.stringify(event));
+      localStorage.setItem(STORAGE_KEYS.APP_SETTINGS, JSON.stringify(settings));
+      return true;
+    } catch (error) {
+      console.error('Error hydrating remote data:', error);
       return false;
     }
   },

@@ -209,18 +209,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
   useEffect(() => {
-    // Load data from localStorage on mount
-    const event = storage.getEvent();
-    const settings = storage.getSettings();
+    const loadData = async () => {
+      await storage.hydrateFromRemote();
 
-    // Ensure event has required properties
-    const safeEvent = {
-      ...event,
-      teams: event.teams || [],
-      categories: event.categories || [],
+      const event = storage.getEvent();
+      const settings = storage.getSettings();
+
+      const safeEvent = {
+        ...event,
+        teams: event.teams || [],
+        categories: event.categories || [],
+      };
+
+      dispatch({ type: 'LOAD_DATA', payload: { event: safeEvent, settings } });
     };
 
-    dispatch({ type: 'LOAD_DATA', payload: { event: safeEvent, settings } });
+    void loadData();
   }, []);
 
   // Helper functions
