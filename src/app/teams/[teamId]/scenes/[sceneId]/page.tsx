@@ -51,7 +51,7 @@ export default function SceneEditPage() {
     setHasChanges(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.title.trim()) {
       toast.error('Scene title is required');
       return;
@@ -71,9 +71,13 @@ export default function SceneEditPage() {
       }
     }
 
-    updateScene(teamId, sceneId, updates);
-    setHasChanges(false);
-    toast.success('Scene saved successfully!');
+    try {
+      await updateScene(teamId, sceneId, updates);
+      setHasChanges(false);
+      toast.success('Scene saved to database!');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to save scene');
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

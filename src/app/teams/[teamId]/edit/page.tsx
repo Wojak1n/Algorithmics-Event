@@ -70,7 +70,7 @@ export default function EditTeamPage() {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.name.trim() || !formData.projectName.trim()) {
@@ -84,17 +84,21 @@ export default function EditTeamPage() {
       return;
     }
 
-    updateTeam(teamId, {
-      name: formData.name.trim(),
-      slogan: formData.slogan.trim(),
-      projectName: formData.projectName.trim(),
-      categoryId: formData.categoryId,
-      members,
-      logoUrl: formData.logoUrl,
-    });
-    
-    toast.success('Team updated successfully!');
-    router.push('/teams');
+    try {
+      await updateTeam(teamId, {
+        name: formData.name.trim(),
+        slogan: formData.slogan.trim(),
+        projectName: formData.projectName.trim(),
+        categoryId: formData.categoryId,
+        members,
+        logoUrl: formData.logoUrl,
+      });
+
+      toast.success('Team saved to database!');
+      router.push('/teams');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to save team');
+    }
   };
 
   if (state.loading) {

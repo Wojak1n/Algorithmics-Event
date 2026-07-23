@@ -72,20 +72,24 @@ export default function DataManager({ onDataImported }: DataManagerProps) {
     event.target.value = ''; // Reset input
   };
 
-  const handleClearData = () => {
+  const handleClearData = async () => {
     if (confirm('Are you sure you want to clear all data? This action cannot be undone.')) {
-      storage.clearAll();
-      toast.success('All data cleared');
-      onDataImported?.();
+      try {
+        await storage.clearAll();
+        toast.success('All database data cleared');
+        onDataImported?.();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to clear database data');
+      }
     }
   };
 
-  const handleLoadSampleData = () => {
+  const handleLoadSampleData = async () => {
     if (hasData && !confirm('This will overwrite existing data. Continue?')) {
       return;
     }
 
-    if (storage.loadSampleData()) {
+    if (await storage.loadSampleData()) {
       toast.success('Sample data loaded successfully!');
       onDataImported?.();
     } else {

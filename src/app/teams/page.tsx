@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useApp } from '../context/AppContext';
@@ -10,10 +10,6 @@ import ImageUpload from '../components/ImageUpload';
 import { getTeamDisplayImage } from '../lib/imageUtils';
 import { storage } from '../lib/storage';
 import toast from 'react-hot-toast';
-
-// LocalStorage keys
-const MEMBER_COLORS_STORAGE_KEY = 'algorithmics_member_colors';
-const PRESENTATION_STATUS_STORAGE_KEY = 'algorithmics_presentation_status';
 
 // Color options for individual members (matching category color system)
 const memberColorOptions = [
@@ -68,7 +64,7 @@ const memberColorOptions = [
 ];
 
 export default function TeamsPage() {
-  const { state, addTeam, deleteTeam, dispatch } = useApp();
+  const { state, addTeam, deleteTeam, dispatch, updateSettings } = useApp();
   const [showAddForm, setShowAddForm] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [showMemberColorPicker, setShowMemberColorPicker] = useState(false);
@@ -76,9 +72,9 @@ export default function TeamsPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [draggedTeam, setDraggedTeam] = useState<string | null>(null);
   // Store member colors: teamId -> memberIndex -> colorIndex
-  const [memberColors, setMemberColors] = useState<{[teamId: string]: {[memberIndex: number]: number}}>({});
+  const [memberColors, setMemberColors] = useState<{[teamId: string]: {[memberIndex: number]: number}}>(state.settings.memberColors || {});
   // Store presentation completion status: teamId -> boolean
-  const [presentationStatus, setPresentationStatus] = useState<{[teamId: string]: boolean}>({});
+  const [presentationStatus, setPresentationStatus] = useState<{[teamId: string]: boolean}>(state.settings.presentationStatus || {});
   const [formData, setFormData] = useState({
     name: '',
     slogan: '',
@@ -88,26 +84,10 @@ export default function TeamsPage() {
     logoUrl: undefined as string | undefined,
   });
 
-  // Load member colors and presentation status from localStorage on component mount
   useEffect(() => {
-    try {
-      // Load member colors
-      const savedColors = localStorage.getItem(MEMBER_COLORS_STORAGE_KEY);
-      if (savedColors) {
-        const parsedColors = JSON.parse(savedColors);
-        setMemberColors(parsedColors);
-      }
-
-      // Load presentation status
-      const savedStatus = localStorage.getItem(PRESENTATION_STATUS_STORAGE_KEY);
-      if (savedStatus) {
-        const parsedStatus = JSON.parse(savedStatus);
-        setPresentationStatus(parsedStatus);
-      }
-    } catch (error) {
-      console.error('Error loading data from localStorage:', error);
-    }
-  }, []);
+    setMemberColors(state.settings.memberColors || {});
+    setPresentationStatus(state.settings.presentationStatus || {});
+  }, [state.settings.memberColors, state.settings.presentationStatus]);
 
   // Safety check for state. This must come after hooks to preserve hook order.
   if (!state?.event) {
@@ -121,22 +101,12 @@ export default function TeamsPage() {
   const teams = state.event.teams || [];
   const categories = state.event.categories || [];
 
-  // Function to save member colors to localStorage
   const saveMemberColorsToStorage = (colors: {[teamId: string]: {[memberIndex: number]: number}}) => {
-    try {
-      localStorage.setItem(MEMBER_COLORS_STORAGE_KEY, JSON.stringify(colors));
-    } catch (error) {
-      console.error('Error saving member colors to localStorage:', error);
-    }
+    updateSettings({ memberColors: colors });
   };
 
-  // Function to save presentation status to localStorage
   const savePresentationStatusToStorage = (status: {[teamId: string]: boolean}) => {
-    try {
-      localStorage.setItem(PRESENTATION_STATUS_STORAGE_KEY, JSON.stringify(status));
-    } catch (error) {
-      console.error('Error saving presentation status to localStorage:', error);
-    }
+    updateSettings({ presentationStatus: status });
   };
 
   // Note: PPTs are stored as object URLs in component state
@@ -163,7 +133,7 @@ export default function TeamsPage() {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.name.trim() || !formData.projectName.trim()) {
@@ -182,7 +152,12 @@ export default function TeamsPage() {
       return;
     }
 
-    addTeam(formData.name.trim(), formData.slogan.trim(), formData.projectName.trim(), formData.categoryId, members, formData.logoUrl);
+    try {
+      await addTeam(formData.name.trim(), formData.slogan.trim(), formData.projectName.trim(), formData.categoryId, members, formData.logoUrl);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to add team');
+      return;
+    }
 
     setFormData({
       name: '',
@@ -196,10 +171,14 @@ export default function TeamsPage() {
     toast.success('Team added successfully!');
   };
 
-  const handleDeleteTeam = (teamId: string, teamName: string) => {
+  const handleDeleteTeam = async (teamId: string, teamName: string) => {
     if (confirm(`Are you sure you want to delete team "${teamName}"? This will also delete all their scenes.`)) {
-      deleteTeam(teamId);
-      toast.success('Team deleted successfully');
+      try {
+        await deleteTeam(teamId);
+        toast.success('Team deleted from database');
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to delete team');
+      }
     }
   };
 
@@ -225,7 +204,7 @@ export default function TeamsPage() {
     e.dataTransfer.dropEffect = 'move';
   };
 
-  const handleDrop = (e: React.DragEvent, targetTeamId: string) => {
+  const handleDrop = async (e: React.DragEvent, targetTeamId: string) => {
     e.preventDefault();
 
     if (!draggedTeam || draggedTeam === targetTeamId) {
@@ -246,20 +225,22 @@ export default function TeamsPage() {
     const [draggedTeamData] = newTeams.splice(draggedIndex, 1);
     newTeams.splice(targetIndex, 0, draggedTeamData);
 
-    // Update the event with reordered teams and save to localStorage
+    // Update the event with reordered teams and save to Supabase
     const updatedEvent = {
       ...state.event,
       teams: newTeams
     };
 
-    // Save to localStorage using the proper storage utility
-    storage.saveEvent(updatedEvent);
-
-    // Update context state
-    dispatch({ type: 'LOAD_DATA', payload: { event: updatedEvent, settings: state.settings } });
-
-    setDraggedTeam(null);
-    toast.success('Team order updated and saved!');
+    // Save to the database
+    try {
+      await storage.saveEventToDatabase(updatedEvent);
+      dispatch({ type: 'LOAD_DATA', payload: { event: updatedEvent, settings: state.settings } });
+      toast.success('Team order saved to database!');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to save team order');
+    } finally {
+      setDraggedTeam(null);
+    }
   };
 
 

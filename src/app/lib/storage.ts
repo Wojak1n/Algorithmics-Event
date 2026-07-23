@@ -1,11 +1,6 @@
 import { Team, Scene, CompetitionEvent, AppSettings, TeamCategory } from '../types';
 import { isSupabaseConfigured, supabase } from './supabase';
 
-const STORAGE_KEYS = {
-  COMPETITION_EVENT: 'algorithmics_competition_event',
-  APP_SETTINGS: 'algorithmics_app_settings',
-} as const;
-
 const TABLE_NAME = 'competition_event';
 
 const normalizeEvent = (event: Partial<CompetitionEvent> | null | undefined): CompetitionEvent => {
@@ -21,8 +16,26 @@ const normalizeEvent = (event: Partial<CompetitionEvent> | null | undefined): Co
 
   return {
     ...baseEvent,
-    teams: Array.isArray(baseEvent.teams) ? baseEvent.teams : [],
-    categories: Array.isArray(baseEvent.categories) ? baseEvent.categories : [],
+    teams: Array.isArray(baseEvent.teams)
+      ? baseEvent.teams.map(team => ({
+          ...team,
+          createdAt: team.createdAt ? new Date(team.createdAt) : new Date(),
+          updatedAt: team.updatedAt ? new Date(team.updatedAt) : new Date(),
+          scenes: Array.isArray(team.scenes)
+            ? team.scenes.map(scene => ({
+                ...scene,
+                createdAt: scene.createdAt ? new Date(scene.createdAt) : new Date(),
+                updatedAt: scene.updatedAt ? new Date(scene.updatedAt) : new Date(),
+              }))
+            : [],
+        }))
+      : [],
+    categories: Array.isArray(baseEvent.categories)
+      ? baseEvent.categories.map(category => ({
+          ...category,
+          createdAt: category.createdAt ? new Date(category.createdAt) : new Date(),
+        }))
+      : [],
   };
 };
 
@@ -104,96 +117,68 @@ const DEFAULT_SETTINGS: AppSettings = {
   defaultSceneDuration: 5,
 };
 
+// Runtime state is kept only in memory. Supabase is the sole persistent store.
+let currentEvent = DEFAULT_EVENT;
+let currentSettings = DEFAULT_SETTINGS;
+let databaseWriteQueue: Promise<void> = Promise.resolve();
+
+const queueDatabaseWrite = (event: CompetitionEvent, settings: AppSettings): Promise<void> => {
+  const write = databaseWriteQueue
+    .catch(() => undefined)
+    .then(() => saveToSupabase(event, settings));
+  databaseWriteQueue = write;
+  return write;
+};
+
 // Storage utilities
 export const storage = {
+  /**
+   * Persist an event to the remote database and only resolve after Supabase
+   * confirms the write. Use this for UI actions that need reliable feedback.
+   */
+  saveEventToDatabase: async (event: CompetitionEvent): Promise<void> => {
+    await queueDatabaseWrite(event, storage.getSettings());
+    currentEvent = normalizeEvent(event);
+  },
+
+  saveSettingsToDatabase: async (settings: AppSettings, event: CompetitionEvent): Promise<void> => {
+    await queueDatabaseWrite(event, settings);
+    currentEvent = normalizeEvent(event);
+    currentSettings = { ...DEFAULT_SETTINGS, ...settings };
+  },
+
   // Competition Event
   getEvent: (): CompetitionEvent => {
-    if (typeof window === 'undefined') return DEFAULT_EVENT;
-
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.COMPETITION_EVENT);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        const safeTeams = Array.isArray(parsed.teams) ? parsed.teams : [];
-        parsed.teams = safeTeams.map((team: Team & { createdAt?: string | Date; updatedAt?: string | Date; scenes?: (Scene & { createdAt?: string | Date; updatedAt?: string | Date })[] }) => {
-          const scenesArr = Array.isArray(team.scenes) ? team.scenes : [];
-          return {
-            ...team,
-            createdAt: team.createdAt ? new Date(team.createdAt as string) : new Date(),
-            updatedAt: team.updatedAt ? new Date(team.updatedAt as string) : new Date(),
-            scenes: scenesArr.map((scene: Scene & { createdAt?: string | Date; updatedAt?: string | Date }) => ({
-              ...scene,
-              createdAt: scene.createdAt ? new Date(scene.createdAt as string) : new Date(),
-              updatedAt: scene.updatedAt ? new Date(scene.updatedAt as string) : new Date(),
-            })),
-          } as Team;
-        });
-        parsed.categories = Array.isArray(parsed.categories) ? parsed.categories : [];
-        return normalizeEvent(parsed);
-      }
-    } catch (error) {
-      console.error('Error loading event data:', error);
-    }
-
-    return DEFAULT_EVENT;
+    return currentEvent;
   },
 
   saveEvent: (event: CompetitionEvent): void => {
-    if (typeof window === 'undefined') return;
-
-    try {
-      localStorage.setItem(STORAGE_KEYS.COMPETITION_EVENT, JSON.stringify(event));
-      void syncToSupabase(event, storage.getSettings());
-    } catch (error) {
-      console.error('Error saving event data:', error);
-    }
+    currentEvent = normalizeEvent(event);
+    void syncToSupabase(currentEvent, currentSettings);
   },
 
   // App Settings
   getSettings: (): AppSettings => {
-    if (typeof window === 'undefined') return DEFAULT_SETTINGS;
-
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.APP_SETTINGS);
-      if (stored) {
-        return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
-      }
-    } catch (error) {
-      console.error('Error loading settings:', error);
-    }
-
-    return DEFAULT_SETTINGS;
+    return currentSettings;
   },
 
   saveSettings: (settings: AppSettings): void => {
-    if (typeof window === 'undefined') return;
-
-    try {
-      localStorage.setItem(STORAGE_KEYS.APP_SETTINGS, JSON.stringify(settings));
-      const event = storage.getEvent();
-      void syncToSupabase(event, settings);
-    } catch (error) {
-      console.error('Error saving settings:', error);
-    }
+    currentSettings = { ...DEFAULT_SETTINGS, ...settings };
+    void syncToSupabase(currentEvent, currentSettings);
   },
 
   // Clear all data
-  clearAll: (): void => {
-    if (typeof window === 'undefined') return;
-
-    Object.values(STORAGE_KEYS).forEach(key => {
-      localStorage.removeItem(key);
-    });
-
+  clearAll: async (): Promise<void> => {
     if (isSupabaseConfigured() && supabase) {
-      void supabase.from(TABLE_NAME).delete().eq('id', 'default');
+      const { error } = await supabase.from(TABLE_NAME).delete().eq('id', 'default');
+      if (error) throw new Error(`Supabase delete failed: ${error.message}`);
     }
+    currentEvent = DEFAULT_EVENT;
+    currentSettings = DEFAULT_SETTINGS;
   },
 
   // Data export/import for backup and recovery
   exportData: () => {
-    if (typeof window === 'undefined') return null;
-
     const event = storage.getEvent();
     const settings = storage.getSettings();
 
@@ -206,8 +191,6 @@ export const storage = {
   },
 
   importData: async (data: { event?: CompetitionEvent; settings?: AppSettings }): Promise<boolean> => {
-    if (typeof window === 'undefined') return false;
-
     if (!data.event || typeof data.event !== 'object') {
       throw new Error('The backup file does not contain valid event data.');
     }
@@ -218,29 +201,29 @@ export const storage = {
     // Confirm the remote write before replacing the browser's local copy.
     await saveToSupabase(event, settings);
 
-    localStorage.setItem(STORAGE_KEYS.COMPETITION_EVENT, JSON.stringify(event));
-    localStorage.setItem(STORAGE_KEYS.APP_SETTINGS, JSON.stringify(settings));
+    currentEvent = event;
+    currentSettings = settings;
     return true;
   },
 
   hydrateFromRemote: async () => {
-    if (typeof window === 'undefined') return false;
-
     try {
       const remoteData = await loadFromSupabase();
       if (!remoteData) {
-        return false;
+        currentEvent = DEFAULT_EVENT;
+        currentSettings = DEFAULT_SETTINGS;
+        return { event: currentEvent, settings: currentSettings };
       }
 
       const event = normalizeEvent(remoteData.event);
       const settings = remoteData.settings || DEFAULT_SETTINGS;
 
-      localStorage.setItem(STORAGE_KEYS.COMPETITION_EVENT, JSON.stringify(event));
-      localStorage.setItem(STORAGE_KEYS.APP_SETTINGS, JSON.stringify(settings));
-      return true;
+      currentEvent = event;
+      currentSettings = { ...DEFAULT_SETTINGS, ...settings };
+      return { event: currentEvent, settings: currentSettings };
     } catch (error) {
       console.error('Error hydrating remote data:', error);
-      return false;
+      throw error;
     }
   },
 
@@ -252,9 +235,7 @@ export const storage = {
   },
 
   // Load sample data for quick start
-  loadSampleData: () => {
-    if (typeof window === 'undefined') return false;
-
+  loadSampleData: async () => {
     try {
       const event = storage.getEvent();
 
@@ -295,7 +276,7 @@ export const storage = {
         categories,
       };
 
-      storage.saveEvent(updatedEvent);
+      await storage.saveEventToDatabase(updatedEvent);
       return true;
     } catch (error) {
       console.error('Error loading sample data:', error);

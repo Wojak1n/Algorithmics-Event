@@ -45,7 +45,7 @@ export default function CategoryManager({ isOpen, onClose }: CategoryManagerProp
     icon: '👨‍💻',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.name.trim()) {
@@ -59,13 +59,18 @@ export default function CategoryManager({ isOpen, onClose }: CategoryManagerProp
       return;
     }
 
-    addCategory(
-      formData.name.trim(),
-      formData.description.trim(),
-      formData.color,
-      formData.bgColor,
-      formData.icon
-    );
+    try {
+      await addCategory(
+        formData.name.trim(),
+        formData.description.trim(),
+        formData.color,
+        formData.bgColor,
+        formData.icon
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create category');
+      return;
+    }
 
     setFormData({
       name: '',
@@ -100,7 +105,7 @@ export default function CategoryManager({ isOpen, onClose }: CategoryManagerProp
     });
   };
 
-  const handleEditSubmit = (categoryId: string) => {
+  const handleEditSubmit = async (categoryId: string) => {
     if (!editFormData.name.trim()) {
       toast.error('Category name is required');
       return;
@@ -115,19 +120,24 @@ export default function CategoryManager({ isOpen, onClose }: CategoryManagerProp
       return;
     }
 
-    updateCategory(categoryId, {
-      name: editFormData.name.trim(),
-      description: editFormData.description.trim(),
-      color: editFormData.color,
-      bgColor: editFormData.bgColor,
-      icon: editFormData.icon,
-    });
+    try {
+      await updateCategory(categoryId, {
+        name: editFormData.name.trim(),
+        description: editFormData.description.trim(),
+        color: editFormData.color,
+        bgColor: editFormData.bgColor,
+        icon: editFormData.icon,
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update category');
+      return;
+    }
 
     setEditingCategory(null);
     toast.success('Category updated successfully!');
   };
 
-  const handleDelete = (category: TeamCategory) => {
+  const handleDelete = async (category: TeamCategory) => {
     // Check if any teams use this category
     const teamsUsingCategory = state.event.teams.filter(team => team.categoryId === category.id);
     
@@ -137,8 +147,12 @@ export default function CategoryManager({ isOpen, onClose }: CategoryManagerProp
     }
 
     if (confirm(`Are you sure you want to delete the category "${category.name}"?`)) {
-      deleteCategory(category.id);
-      toast.success('Category deleted successfully!');
+      try {
+        await deleteCategory(category.id);
+        toast.success('Category deleted from database!');
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to delete category');
+      }
     }
   };
 

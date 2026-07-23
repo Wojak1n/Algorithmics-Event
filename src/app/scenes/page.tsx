@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useApp } from '../context/AppContext';
 import { ArrowLeft, FileText, Clock, CheckCircle, Circle, Play, Edit } from 'lucide-react';
 import { SceneStatus } from '../types';
+import toast from 'react-hot-toast';
 
 const statusConfig = {
   'not-started': { icon: Circle, color: 'text-gray-400', bg: 'bg-gray-100 dark:bg-gray-700', label: 'Not Started' },
@@ -35,8 +36,14 @@ export default function ScenesPage() {
           (team.scenes || []).map(scene => ({ ...scene, teamName: team.name, teamId: team.id }))
         );
 
-  const handleStatusChange = (teamId: string, sceneId: string, status: SceneStatus) => {
-    updateSceneStatus(teamId, sceneId, status);
+  const handleStatusChange = async (teamId: string, sceneId: string, status: SceneStatus) => {
+    try {
+      await updateSceneStatus(teamId, sceneId, status);
+      toast.success('Scene status saved to database');
+    } catch (error) {
+      console.error('Failed to save scene status:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to save scene status');
+    }
   };
 
   return (

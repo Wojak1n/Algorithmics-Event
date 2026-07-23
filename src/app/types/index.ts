@@ -63,4 +63,6 @@ export interface AppSettings {
   darkMode: boolean;
   autoSave: boolean;
   defaultSceneDuration: number;
+  memberColors?: {[teamId: string]: {[memberIndex: number]: number}};
+  presentationStatus?: {[teamId: string]: boolean};
 }

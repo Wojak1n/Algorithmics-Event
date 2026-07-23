@@ -57,7 +57,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state.event,
         teams: [...state.event.teams, action.payload],
       };
-      storage.saveEvent(newEvent);
       return { ...state, event: newEvent };
 
     case 'UPDATE_TEAM':
@@ -67,13 +66,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
           : team
       );
       const updatedEvent = { ...state.event, teams: updatedTeams };
-      storage.saveEvent(updatedEvent);
       return { ...state, event: updatedEvent };
 
     case 'DELETE_TEAM':
       const filteredTeams = state.event.teams.filter(team => team.id !== action.payload);
       const eventAfterDelete = { ...state.event, teams: filteredTeams };
-      storage.saveEvent(eventAfterDelete);
       return { ...state, event: eventAfterDelete };
 
     case 'ADD_SCENE':
@@ -83,7 +80,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
           : team
       );
       const eventWithNewScene = { ...state.event, teams: teamsWithNewScene };
-      storage.saveEvent(eventWithNewScene);
       return { ...state, event: eventWithNewScene };
 
     case 'UPDATE_SCENE':
@@ -101,7 +97,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
           : team
       );
       const eventWithUpdatedScene = { ...state.event, teams: teamsWithUpdatedScene };
-      storage.saveEvent(eventWithUpdatedScene);
       return { ...state, event: eventWithUpdatedScene };
 
     case 'DELETE_SCENE':
@@ -115,7 +110,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
           : team
       );
       const eventWithoutScene = { ...state.event, teams: teamsWithoutScene };
-      storage.saveEvent(eventWithoutScene);
       return { ...state, event: eventWithoutScene };
 
     case 'UPDATE_SCENE_STATUS':
@@ -133,7 +127,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
           : team
       );
       const eventWithStatusUpdate = { ...state.event, teams: teamsWithStatusUpdate };
-      storage.saveEvent(eventWithStatusUpdate);
       return { ...state, event: eventWithStatusUpdate };
 
     case 'ADD_CATEGORY':
@@ -141,7 +134,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state.event,
         categories: [...state.event.categories, action.payload]
       };
-      storage.saveEvent(eventWithNewCategory);
       return {
         ...state,
         event: eventWithNewCategory,
@@ -156,7 +148,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
             : category
         )
       };
-      storage.saveEvent(eventWithUpdatedCategory);
       return {
         ...state,
         event: eventWithUpdatedCategory,
@@ -167,7 +158,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state.event,
         categories: state.event.categories.filter(cat => cat.id !== action.payload)
       };
-      storage.saveEvent(eventWithoutCategory);
       return {
         ...state,
         event: eventWithoutCategory,
@@ -175,7 +165,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
     case 'UPDATE_SETTINGS':
       const newSettings = { ...state.settings, ...action.payload };
-      storage.saveSettings(newSettings);
       return { ...state, settings: newSettings };
 
     case 'SET_LOADING':
@@ -190,17 +179,17 @@ interface AppContextType {
   state: AppState;
   dispatch: React.Dispatch<AppAction>;
   // Helper functions
-  addTeam: (name: string, slogan: string, projectName: string, categoryId: string, members: string[], logoUrl?: string) => void;
-  addCategory: (name: string, description: string, color: string, bgColor: string, icon: string) => void;
-  updateCategory: (id: string, updates: Partial<TeamCategory>) => void;
-  deleteCategory: (id: string) => void;
-  updateTeam: (id: string, updates: Partial<Team>) => void;
-  deleteTeam: (id: string) => void;
-  addScene: (teamId: string, title: string, content?: string) => void;
-  updateScene: (teamId: string, sceneId: string, updates: Partial<Scene>) => void;
-  deleteScene: (teamId: string, sceneId: string) => void;
-  updateSceneStatus: (teamId: string, sceneId: string, status: SceneStatus) => void;
-  updateSettings: (updates: Partial<AppSettings>) => void;
+  addTeam: (name: string, slogan: string, projectName: string, categoryId: string, members: string[], logoUrl?: string) => Promise<void>;
+  addCategory: (name: string, description: string, color: string, bgColor: string, icon: string) => Promise<void>;
+  updateCategory: (id: string, updates: Partial<TeamCategory>) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
+  updateTeam: (id: string, updates: Partial<Team>) => Promise<void>;
+  deleteTeam: (id: string) => Promise<void>;
+  addScene: (teamId: string, title: string, content?: string) => Promise<void>;
+  updateScene: (teamId: string, sceneId: string, updates: Partial<Scene>) => Promise<void>;
+  deleteScene: (teamId: string, sceneId: string) => Promise<void>;
+  updateSceneStatus: (teamId: string, sceneId: string, status: SceneStatus) => Promise<void>;
+  updateSettings: (updates: Partial<AppSettings>) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -208,12 +197,21 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
+  const commitEvent = async (event: CompetitionEvent) => {
+    await storage.saveEventToDatabase(event);
+    dispatch({ type: 'LOAD_DATA', payload: { event, settings: state.settings } });
+  };
+
+  const commitSettings = async (settings: AppSettings) => {
+    await storage.saveSettingsToDatabase(settings, state.event);
+    dispatch({ type: 'LOAD_DATA', payload: { event: state.event, settings } });
+  };
+
   useEffect(() => {
     const loadData = async () => {
-      await storage.hydrateFromRemote();
-
-      const event = storage.getEvent();
-      const settings = storage.getSettings();
+      const remote = await storage.hydrateFromRemote();
+      const event = remote.event;
+      const settings = remote.settings;
 
       const safeEvent = {
         ...event,
@@ -228,53 +226,96 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Helper functions
-  const addTeam = (name: string, slogan: string, projectName: string, categoryId: string, members: string[], logoUrl?: string) => {
+  const addTeam = async (name: string, slogan: string, projectName: string, categoryId: string, members: string[], logoUrl?: string) => {
     const newTeam = createNewTeam(name, slogan, projectName, categoryId, members, logoUrl);
-    dispatch({ type: 'ADD_TEAM', payload: newTeam });
+    await commitEvent({ ...state.event, teams: [...state.event.teams, newTeam] });
   };
 
-  const addCategory = (name: string, description: string, color: string, bgColor: string, icon: string) => {
+  const addCategory = async (name: string, description: string, color: string, bgColor: string, icon: string) => {
     const newCategory = createNewCategory(name, description, color, bgColor, icon);
-    dispatch({ type: 'ADD_CATEGORY', payload: newCategory });
+    await commitEvent({ ...state.event, categories: [...state.event.categories, newCategory] });
   };
 
-  const updateCategory = (id: string, updates: Partial<TeamCategory>) => {
-    dispatch({ type: 'UPDATE_CATEGORY', payload: { id, updates } });
+  const updateCategory = async (id: string, updates: Partial<TeamCategory>) => {
+    await commitEvent({
+      ...state.event,
+      categories: state.event.categories.map(category => category.id === id ? { ...category, ...updates } : category),
+    });
   };
 
-  const deleteCategory = (id: string) => {
-    dispatch({ type: 'DELETE_CATEGORY', payload: id });
+  const deleteCategory = async (id: string) => {
+    await commitEvent({ ...state.event, categories: state.event.categories.filter(category => category.id !== id) });
   };
 
-  const updateTeam = (id: string, updates: Partial<Team>) => {
-    dispatch({ type: 'UPDATE_TEAM', payload: { id, updates } });
+  const updateTeam = async (id: string, updates: Partial<Team>) => {
+    await commitEvent({
+      ...state.event,
+      teams: state.event.teams.map(team => team.id === id ? { ...team, ...updates, updatedAt: new Date() } : team),
+    });
   };
 
-  const deleteTeam = (id: string) => {
-    dispatch({ type: 'DELETE_TEAM', payload: id });
+  const deleteTeam = async (id: string) => {
+    await commitEvent({ ...state.event, teams: state.event.teams.filter(team => team.id !== id) });
   };
 
-  const addScene = (teamId: string, title: string, content: string = '') => {
+  const addScene = async (teamId: string, title: string, content: string = '') => {
     const team = state.event.teams.find(t => t.id === teamId);
     const order = team ? (team.scenes ? team.scenes.length : 0) : 0;
     const newScene = createNewScene(teamId, title, content, order);
-    dispatch({ type: 'ADD_SCENE', payload: { teamId, scene: newScene } });
+    await commitEvent({
+      ...state.event,
+      teams: state.event.teams.map(item => item.id === teamId
+        ? { ...item, scenes: [...item.scenes, newScene], updatedAt: new Date() }
+        : item),
+    });
   };
 
-  const updateScene = (teamId: string, sceneId: string, updates: Partial<Scene>) => {
-    dispatch({ type: 'UPDATE_SCENE', payload: { teamId, sceneId, updates } });
+  const updateScene = async (teamId: string, sceneId: string, updates: Partial<Scene>) => {
+    await commitEvent({
+      ...state.event,
+      teams: state.event.teams.map(team => team.id === teamId ? {
+        ...team,
+        updatedAt: new Date(),
+        scenes: team.scenes.map(scene => scene.id === sceneId ? { ...scene, ...updates, updatedAt: new Date() } : scene),
+      } : team),
+    });
   };
 
-  const deleteScene = (teamId: string, sceneId: string) => {
-    dispatch({ type: 'DELETE_SCENE', payload: { teamId, sceneId } });
+  const deleteScene = async (teamId: string, sceneId: string) => {
+    await commitEvent({
+      ...state.event,
+      teams: state.event.teams.map(team => team.id === teamId ? {
+        ...team,
+        updatedAt: new Date(),
+        scenes: team.scenes.filter(scene => scene.id !== sceneId),
+      } : team),
+    });
   };
 
-  const updateSceneStatus = (teamId: string, sceneId: string, status: SceneStatus) => {
-    dispatch({ type: 'UPDATE_SCENE_STATUS', payload: { teamId, sceneId, status } });
+  const updateSceneStatus = async (teamId: string, sceneId: string, status: SceneStatus) => {
+    const now = new Date();
+    const updatedEvent: CompetitionEvent = {
+      ...state.event,
+      teams: state.event.teams.map(team =>
+        team.id === teamId
+          ? {
+              ...team,
+              updatedAt: now,
+              scenes: team.scenes.map(scene =>
+                scene.id === sceneId
+                  ? { ...scene, status, updatedAt: now }
+                  : scene
+              ),
+            }
+          : team
+      ),
+    };
+
+    await commitEvent(updatedEvent);
   };
 
-  const updateSettings = (updates: Partial<AppSettings>) => {
-    dispatch({ type: 'UPDATE_SETTINGS', payload: updates });
+  const updateSettings = async (updates: Partial<AppSettings>) => {
+    await commitSettings({ ...state.settings, ...updates });
   };
 
   const contextValue: AppContextType = {

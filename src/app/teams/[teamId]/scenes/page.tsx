@@ -24,29 +24,42 @@ export default function TeamScenesPage() {
 
   const team = state.event.teams.find(t => t.id === teamId);
 
-  const handleAddScene = (e: React.FormEvent) => {
+  const handleAddScene = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSceneTitle.trim()) {
       toast.error('Scene title is required');
       return;
     }
 
-    addScene(teamId, newSceneTitle.trim());
-    setNewSceneTitle('');
-    setShowAddForm(false);
-    toast.success('Scene added successfully!');
-  };
-
-  const handleDeleteScene = (sceneId: string, sceneTitle: string) => {
-    if (confirm(`Are you sure you want to delete scene "${sceneTitle}"?`)) {
-      deleteScene(teamId, sceneId);
-      toast.success('Scene deleted successfully');
+    try {
+      await addScene(teamId, newSceneTitle.trim());
+      setNewSceneTitle('');
+      setShowAddForm(false);
+      toast.success('Scene added and saved!');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to add scene');
     }
   };
 
-  const handleStatusChange = (sceneId: string, status: SceneStatus) => {
-    updateSceneStatus(teamId, sceneId, status);
-    toast.success(`Scene status updated to ${status.replace('-', ' ')}`);
+  const handleDeleteScene = async (sceneId: string, sceneTitle: string) => {
+    if (confirm(`Are you sure you want to delete scene "${sceneTitle}"?`)) {
+      try {
+        await deleteScene(teamId, sceneId);
+        toast.success('Scene deleted from database');
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to delete scene');
+      }
+    }
+  };
+
+  const handleStatusChange = async (sceneId: string, status: SceneStatus) => {
+    try {
+      await updateSceneStatus(teamId, sceneId, status);
+      toast.success(`Scene status saved as ${status.replace('-', ' ')}`);
+    } catch (error) {
+      console.error('Failed to save scene status:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to save scene status');
+    }
   };
 
   if (state.loading) {
