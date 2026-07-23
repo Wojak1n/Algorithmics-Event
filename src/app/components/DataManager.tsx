@@ -49,18 +49,19 @@ export default function DataManager({ onDataImported }: DataManagerProps) {
     setIsImporting(true);
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = JSON.parse(e.target?.result as string);
-        
-        if (storage.importData(data)) {
-          toast.success('Data imported successfully!');
+
+        if (await storage.importData(data)) {
+          toast.success('Data imported and saved to Supabase!');
           onDataImported?.();
         } else {
           toast.error('Failed to import data');
         }
       } catch (error) {
-        toast.error('Invalid file format');
+        const message = error instanceof Error ? error.message : 'Invalid file format';
+        toast.error(message);
         console.error('Import error:', error);
       } finally {
         setIsImporting(false);

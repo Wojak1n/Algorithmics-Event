@@ -28,20 +28,34 @@ const normalizeEvent = (event: Partial<CompetitionEvent> | null | undefined): Co
 
 const cloneEvent = (event: CompetitionEvent): CompetitionEvent => JSON.parse(JSON.stringify(event));
 
+async function saveToSupabase(event: CompetitionEvent, settings: AppSettings) {
+  if (!isSupabaseConfigured() || !supabase) {
+    throw new Error('Supabase is not configured. Check your .env.local file.');
+  }
+
+  const payload = {
+    id: 'default',
+    event: cloneEvent(event),
+    settings,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabase
+    .from(TABLE_NAME)
+    .upsert(payload, { onConflict: 'id' });
+
+  if (error) {
+    throw new Error(`Supabase save failed: ${error.message}`);
+  }
+}
+
 async function syncToSupabase(event: CompetitionEvent, settings: AppSettings) {
   if (!isSupabaseConfigured() || !supabase) {
     return;
   }
 
   try {
-    const payload = {
-      id: 'default',
-      event: cloneEvent(event),
-      settings,
-      updated_at: new Date().toISOString(),
-    };
-
-    await supabase.from(TABLE_NAME).upsert(payload, { onConflict: 'id' }).select();
+    await saveToSupabase(event, settings);
   } catch (error) {
     console.error('Error syncing data to Supabase:', error);
   }
@@ -191,21 +205,22 @@ export const storage = {
     };
   },
 
-  importData: (data: { event?: CompetitionEvent; settings?: AppSettings }) => {
+  importData: async (data: { event?: CompetitionEvent; settings?: AppSettings }): Promise<boolean> => {
     if (typeof window === 'undefined') return false;
 
-    try {
-      if (data.event) {
-        storage.saveEvent(data.event);
-      }
-      if (data.settings) {
-        storage.saveSettings(data.settings);
-      }
-      return true;
-    } catch (error) {
-      console.error('Error importing data:', error);
-      return false;
+    if (!data.event || typeof data.event !== 'object') {
+      throw new Error('The backup file does not contain valid event data.');
     }
+
+    const event = normalizeEvent(data.event);
+    const settings = { ...DEFAULT_SETTINGS, ...(data.settings || {}) };
+
+    // Confirm the remote write before replacing the browser's local copy.
+    await saveToSupabase(event, settings);
+
+    localStorage.setItem(STORAGE_KEYS.COMPETITION_EVENT, JSON.stringify(event));
+    localStorage.setItem(STORAGE_KEYS.APP_SETTINGS, JSON.stringify(settings));
+    return true;
   },
 
   hydrateFromRemote: async () => {
